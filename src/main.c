@@ -1,6 +1,7 @@
 #define HANDMADE_MATH_IMPLEMENTATION
 #define HANDMADE_MATH_NO_SSE
 #include "HandmadeMath.h"
+
 #define SOKOL_IMPL
 #if defined(_WIN32)
 #define SOKOL_LOG(s) OutputDebugStringA(s)
@@ -9,12 +10,15 @@
 #include "sokol_gfx.h"
 #include "sokol_glue.h"
 #include "main.glsl.h"
+
 #include "types.h"
+#include "config.h"
 
 static struct {
 	float rx, ry;
 	sg_pipeline pip;
 	sg_bindings bind;
+	config_t config;
 } state;
 
 void init(void) {
@@ -79,9 +83,14 @@ void init(void) {
 }
 
 void frame(void) {
+	// script
+
+	// physics
+
+	// render
 	vs_params_t vs_params;
-	const float w = sapp_widthf();
-	const float h = sapp_heightf();
+	const float w = state.config.w;
+	const float h = state.config.h;
 	m4 proj = HMM_Perspective(60.0f, w / h, 0.01f, 10.0f);
 	m4 view = HMM_LookAt(V3(0.0f, 1.5f, 6.0f), V3(0.0f, 0.0f, 0.0f), V3(0.0f, 1.0f, 0.0f));
 	m4 view_proj = HMM_MultiplyMat4(proj, view);
@@ -93,11 +102,7 @@ void frame(void) {
 	vs_params.mvp = HMM_MultiplyMat4(view_proj, model);
 
 	sg_pass_action pass_action = {
-	    .colors[0] =
-		{
-		    .action = SG_ACTION_CLEAR,
-		    .value = {0.25f, 0.5f, 0.75f, 1.0f},
-		},
+	    .colors[0] = {.action = SG_ACTION_CLEAR, .value = {0.25f, 0.5f, 0.75f, 1.0f}},
 	};
 	sg_begin_default_pass(&pass_action, (int)w, (int)h);
 	sg_apply_pipeline(state.pip);
@@ -119,13 +124,15 @@ void event(const sapp_event *e) {
 }
 
 sapp_desc sokol_main(int argc, char *argv[]) {
+	state.config = config_load();
+
 	return (sapp_desc){
 	    .init_cb = init,
 	    .frame_cb = frame,
 	    .cleanup_cb = cleanup,
 	    .event_cb = event,
-	    .width = 800,
-	    .height = 600,
+	    .width = state.config.w,
+	    .height = state.config.h,
 	    .gl_force_gles2 = true,
 	    .window_title = "Hello world!",
 	};

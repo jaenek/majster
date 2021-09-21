@@ -1,7 +1,0 @@
-[
-{
-  "directory": "/home/jaenek/workspace/c/majster/build/src",
-  "command": "/usr/bin/clang -DSOKOL_GLCORE33 -I/home/jaenek/workspace/c/majster/src/../vendor/sokol -I/home/jaenek/workspace/c/majster/src/../vendor/hmm -I/home/jaenek/workspace/c/majster/src/shaders  -Wno-missing-field-initializers -Wsign-conversion -std=gnu99 -o CMakeFiles/main.dir/main.c.o -c /home/jaenek/workspace/c/majster/src/main.c",
-  "file": "/home/jaenek/workspace/c/majster/src/main.c"
-}
-]

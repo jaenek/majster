@@ -1,3 +1,4 @@
+Language: Cpp
 BasedOnStyle: LLVM
 ColumnLimit: 100
 IndentWidth: 8
@@ -7,4 +8,6 @@ AccessModifierOffset: -8
 IndentCaseLabels: false
 BreakBeforeBraces: Attach
 SortIncludes: false
-Cpp11BracedListStyle: true
+Cpp11BracedListStyle: false
+SpaceBeforeCpp11BracedList: true
+AlignAfterOpenBracket: DontAlign

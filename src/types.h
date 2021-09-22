@@ -1,3 +1,7 @@
+#ifndef _TYPES_H
+#define _TYPES_H
+
+#include "stdbool.h"
 typedef bool b;
 typedef char i8;
 typedef short int i16;
@@ -22,3 +26,5 @@ typedef hmm_quaternion quat;
 #define V4(...) HMM_Vec4(__VA_ARGS__)
 #define M4(...) HMM_Mat4(__VA_ARGS__)
 #define QUAT(...) HMM_Quaternion(__VA_ARGS__)
+
+#endif // _TYPES_H

@@ -14,16 +14,18 @@ static struct {
 	sg_bindings bind;
 	sg_color clear_color;
 	vs_params_t uniforms;
+	sg_image textures[2];
 } state;
 
 void r2d_init(void) {
 	float vertices[] = {
 		// clang-format off
 		// X      Y     Z
-		 0.5f,  0.5f, 0.0f,
-		 0.5f, -0.5f, 0.0f,
-		-0.5f, -0.5f, 0.0f,
-		-0.5f,  0.5f, 0.0f,
+		// this is not compatible with D3D11 (look at texcube-sapp. sokol example)
+		 0.5f,  0.5f, 0.0f, 1.0f, 1.0f,
+		 0.5f, -0.5f, 0.0f, 1.0f, 0.0f,
+		-0.5f, -0.5f, 0.0f, 0.0f, 0.0f,
+		-0.5f,  0.5f, 0.0f, 0.0f, 1.0f,
 		// clang-format on
 	};
 
@@ -45,7 +47,10 @@ void r2d_init(void) {
 	state.pip = sg_make_pipeline(&(sg_pipeline_desc){
 	    .layout = {
 		    .buffers[0].stride = 0,
-		    .attrs = { [ATTR_vs_position].format = SG_VERTEXFORMAT_FLOAT3 },
+		    .attrs = {
+				[ATTR_vs_position].format = SG_VERTEXFORMAT_FLOAT3,
+				[ATTR_vs_texcoord].format = SG_VERTEXFORMAT_FLOAT2,
+			},
 		},
 	    .shader = shd,
 	    .index_type = SG_INDEXTYPE_UINT16,
@@ -54,7 +59,34 @@ void r2d_init(void) {
 	    .label = "quad-pipeline",
 	});
 
-	state.bind = (sg_bindings) { .vertex_buffers[0] = vbuf, .index_buffer = ibuf };
+	// blank texture - single white pixel
+	u32 pixel[] = { 0xFFFFFFFF };
+	state.textures[0] = sg_make_image(&(sg_image_desc) {
+	    .width = 1,
+	    .height = 1,
+	    .data.subimage[0][0] = SG_RANGE(pixel),
+	    .label = "quad-blank_texture",
+	});
+	u32 pixels[] = {
+		// clang-format off
+		0xFFFFFFFF, 0xFFDDDDDD, 0xFFFFFFFF, 0xFFDDDDDD,
+		0xFFDDDDDD, 0xFFFFFFFF, 0xFFDDDDDD, 0xFFFFFFFF,
+		0xFFFFFFFF, 0xFFDDDDDD, 0xFFFFFFFF, 0xFFDDDDDD,
+		0xFFDDDDDD, 0xFFFFFFFF, 0xFFDDDDDD, 0xFFFFFFFF,
+		// clang-format on
+	};
+	state.textures[1] = sg_make_image(&(sg_image_desc) {
+	    .width = 4,
+	    .height = 4,
+	    .data.subimage[0][0] = SG_RANGE(pixels),
+	    .label = "quad-checkerboard_texture",
+	});
+
+	state.bind = (sg_bindings) {
+		.vertex_buffers[0] = vbuf,
+		.index_buffer = ibuf,
+		.fs_images[SLOT_tex] = state.textures[1],
+	};
 }
 
 void r2d_shutdown(void) {}

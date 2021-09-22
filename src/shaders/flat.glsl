@@ -9,21 +9,28 @@ uniform vs_params {
 };
 
 in vec3 position;
+in vec2 texcoord;
 
 out vec4 color;
+out vec2 uv;
 
 void main() {
     gl_Position = vp * transform * vec4(position, 1.0);
     color = flat_color;
+	uv = texcoord;
 }
 @end
 
 @fs fs
+uniform sampler2D tex;
+
 in vec4 color;
+in vec2 uv;
+
 out vec4 frag_color;
 
 void main() {
-    frag_color = color;
+    frag_color = texture(tex, uv) * color;
 }
 @end
 

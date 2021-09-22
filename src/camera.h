@@ -5,12 +5,13 @@
 
 typedef struct camera_t {
 	v3 pos;
+	float angle;
 	m4 rot;
 	m4 proj;
-	m4 vp;
 } camera_t;
 
-camera_t camera_init();
-void camera_set_pos(camera_t *camera, v3 pos);
+camera_t *camera_init(void);
+void camera_rotate(camera_t *camera, f32 angle);
+m4 camera_get_vp(camera_t *camera);
 
 #endif // _CAMERA_H

@@ -5,11 +5,14 @@
 #include "shaders/flat.glsl.h"
 
 #include "types.h"
+#include "camera.h"
 
 static struct {
 	sg_pipeline pip;
 	sg_bindings bind;
 	vs_params_t vs_params;
+	camera_t camera;
+	sg_color clear_color;
 } state;
 
 void r2d_init() {
@@ -51,6 +54,9 @@ void r2d_init() {
 	});
 
 	state.bind = (sg_bindings) { .vertex_buffers[0] = vbuf, .index_buffer = ibuf };
+
+	state.camera = camera_init();
+	state.vs_params.vp = state.camera.vp;
 }
 
 void r2d_shutdown() {}
@@ -58,16 +64,13 @@ void r2d_shutdown() {}
 void r2d_begin_scene() {
 	const float w = sapp_widthf();
 	const float h = sapp_heightf();
-	struct camera {
-		v3 pos;
-		m4 rot;
-	} camera = {};
-	camera.rot = HMM_Rotate(0.0f, V3(0.0f, 0.0f, 1.0f));
-	m4 xform = HMM_MultiplyMat4(HMM_Translate(camera.pos), camera.rot);
-	state.vs_params.vp = HMM_MultiplyMat4(HMM_Orthographic(-1.2f, 1.2f, -0.9f, 0.9f, -1.0f, 1.0f), xform);
+	state.vs_params.vp = state.camera.vp;
 
 	sg_pass_action pass_action = {
-		.colors[0] = { .action = SG_ACTION_CLEAR, .value = { 0.25f, 0.5f, 0.75f, 1.0f } },
+		.colors[0] = {
+			.action = SG_ACTION_CLEAR,
+		    .value = state.clear_color,
+		},
 	};
 	sg_begin_default_pass(&pass_action, (int)w, (int)h);
 	sg_apply_pipeline(state.pip);
@@ -79,8 +82,12 @@ void r2d_end_scene() {
 	sg_commit();
 }
 
-void r2d_draw_quad(v4 color) {
-	state.vs_params.flat_color = color;
+void r2d_set_clear_color(v4 color) { state.clear_color = *(sg_color *)&color; }
+
+void r2d_set_color(v4 color) { state.vs_params.flat_color = color; }
+
+void r2d_draw_quad(v3 pos) {
+	(void)pos;
 	sg_apply_uniforms(SG_SHADERSTAGE_VS, SLOT_vs_params, &SG_RANGE(state.vs_params));
 	sg_draw(0, 6, 1);
 }

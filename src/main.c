@@ -27,8 +27,10 @@ void frame(void) {
 	// physics
 
 	// render
+	r2d_set_clear_color(V4(0.36f, 0.68f, 0.99f, 0.5f));
 	r2d_begin_scene();
-	r2d_draw_quad(V4(0.99f, 0.72f, 0.44f, 0.5f));
+	r2d_set_color(V4(0.99f, 0.72f, 0.44f, 0.5f));
+	r2d_draw_quad();
 	r2d_end_scene();
 }
 

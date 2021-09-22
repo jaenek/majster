@@ -10,6 +10,6 @@ void r2d_begin_scene(camera_t *c);
 void r2d_end_scene(void);
 void r2d_set_clear_color(v4 col);
 void r2d_set_color(v4 col);
-void r2d_draw_quad(v3 pos);
+void r2d_draw_quad(v2 pos);
 
 #endif // _RENDERER2D_H

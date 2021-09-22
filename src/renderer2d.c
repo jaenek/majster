@@ -1,16 +1,19 @@
 #include "HandmadeMath.h"
-#include "renderer2d.h"
 #include "sokol_gfx.h"
 #include "sokol_app.h"
 #include "shaders/flat.glsl.h"
 
 #include "renderer2d.h"
 
+typedef struct r2d_quad_t {
+	m4 xform;
+} r2d_quad_t;
+
 static struct {
 	sg_pipeline pip;
 	sg_bindings bind;
-	vs_params_t vs_params;
 	sg_color clear_color;
+	vs_params_t uniforms;
 } state;
 
 void r2d_init(void) {
@@ -59,7 +62,8 @@ void r2d_shutdown(void) {}
 void r2d_begin_scene(camera_t *c) {
 	const float w = sapp_widthf();
 	const float h = sapp_heightf();
-	state.vs_params.vp = camera_get_vp(c);
+	state.uniforms.vp = camera_get_vp(c);
+	state.uniforms.flat_color = V4(1.0f, 1.0f, 1.0f, 1.0f);
 
 	sg_pass_action pass_action = {
 		.colors[0] = {
@@ -70,6 +74,7 @@ void r2d_begin_scene(camera_t *c) {
 	sg_begin_default_pass(&pass_action, (int)w, (int)h);
 	sg_apply_pipeline(state.pip);
 	sg_apply_bindings(&state.bind);
+	sg_apply_uniforms(SG_SHADERSTAGE_VS, SLOT_vs_params, &SG_RANGE(state.uniforms));
 }
 
 void r2d_end_scene(void) {
@@ -79,12 +84,12 @@ void r2d_end_scene(void) {
 
 void r2d_set_clear_color(v4 color) { state.clear_color = *(sg_color *)&color; }
 
-void r2d_set_color(v4 color) { state.vs_params.flat_color = color; }
+void r2d_set_color(v4 color) { state.uniforms.flat_color = color; }
 
 // that needs to add a new quad entry to a quad list with
 // a transform of a new quad
-void r2d_draw_quad(v3 pos) {
-	(void)pos;
-	sg_apply_uniforms(SG_SHADERSTAGE_VS, SLOT_vs_params, &SG_RANGE(state.vs_params));
+void r2d_draw_quad(v2 pos) {
+	state.uniforms.transform = HMM_Translate(V3(pos.X, pos.Y, 0.0f));
+	sg_apply_uniforms(SG_SHADERSTAGE_VS, SLOT_vs_params, &SG_RANGE(state.uniforms));
 	sg_draw(0, 6, 1); // this needs to take a quad count from a list
 }

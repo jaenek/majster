@@ -4,6 +4,7 @@
 @vs vs
 uniform vs_params {
     mat4 vp;
+    mat4 transform;
 	vec4 flat_color;
 };
 
@@ -12,7 +13,7 @@ in vec3 position;
 out vec4 color;
 
 void main() {
-    gl_Position = vp * vec4(position, 1.0);
+    gl_Position = vp * transform * vec4(position, 1.0);
     color = flat_color;
 }
 @end

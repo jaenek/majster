@@ -38,10 +38,11 @@ void frame(void) {
 
 	// render
 	u64 start = stm_now();
-	r2d_set_clear_color(V4(0.36f, 0.68f, 0.99f, 0.5f));
+	r2d_set_clear_color(V4(0.36f, 0.68f, 0.99f, 1.0f));
 	r2d_begin_scene(state.camera);
-	r2d_set_color(V4(0.99f, 0.72f, 0.44f, 0.5f));
-	r2d_draw_quad(V3(0.0f, 0.0f, 0.0f));
+	r2d_draw_quad(V2(-1.0f, -1.0f));
+	r2d_set_color(V4(0.99f, 0.72f, 0.44f, 1.0f));
+	r2d_draw_quad(V2(0.0f, 0.0f));
 	r2d_end_scene();
 	state.ticks = stm_laptime(&start);
 }

@@ -1,16 +1,17 @@
 #ifndef _TYPES_H
 #define _TYPES_H
 
-#include "stdbool.h"
+#include <stdbool.h>
+#include <stdint.h>
 typedef bool b;
-typedef char i8;
-typedef short int i16;
-typedef long int i32;
-typedef long long int i64;
-typedef unsigned char u8;
-typedef unsigned short int u16;
-typedef unsigned long int u32;
-typedef unsigned long long int u64;
+typedef int8_t i8;
+typedef int16_t i16;
+typedef int32_t i32;
+typedef int64_t i64;
+typedef uint8_t u8;
+typedef uint16_t u16;
+typedef uint32_t u32;
+typedef uint64_t u64;
 typedef float f32;
 typedef double f64;
 typedef long double f128;

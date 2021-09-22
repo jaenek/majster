@@ -4,18 +4,16 @@
 #include "sokol_app.h"
 #include "shaders/flat.glsl.h"
 
-#include "types.h"
-#include "camera.h"
+#include "renderer2d.h"
 
 static struct {
 	sg_pipeline pip;
 	sg_bindings bind;
 	vs_params_t vs_params;
-	camera_t camera;
 	sg_color clear_color;
 } state;
 
-void r2d_init() {
+void r2d_init(void) {
 	float vertices[] = {
 		// clang-format off
 		// X      Y     Z
@@ -54,17 +52,14 @@ void r2d_init() {
 	});
 
 	state.bind = (sg_bindings) { .vertex_buffers[0] = vbuf, .index_buffer = ibuf };
-
-	state.camera = camera_init();
-	state.vs_params.vp = state.camera.vp;
 }
 
-void r2d_shutdown() {}
+void r2d_shutdown(void) {}
 
-void r2d_begin_scene() {
+void r2d_begin_scene(camera_t *c) {
 	const float w = sapp_widthf();
 	const float h = sapp_heightf();
-	state.vs_params.vp = state.camera.vp;
+	state.vs_params.vp = camera_get_vp(c);
 
 	sg_pass_action pass_action = {
 		.colors[0] = {
@@ -77,7 +72,7 @@ void r2d_begin_scene() {
 	sg_apply_bindings(&state.bind);
 }
 
-void r2d_end_scene() {
+void r2d_end_scene(void) {
 	sg_end_pass();
 	sg_commit();
 }
@@ -86,8 +81,10 @@ void r2d_set_clear_color(v4 color) { state.clear_color = *(sg_color *)&color; }
 
 void r2d_set_color(v4 color) { state.vs_params.flat_color = color; }
 
+// that needs to add a new quad entry to a quad list with
+// a transform of a new quad
 void r2d_draw_quad(v3 pos) {
 	(void)pos;
 	sg_apply_uniforms(SG_SHADERSTAGE_VS, SLOT_vs_params, &SG_RANGE(state.vs_params));
-	sg_draw(0, 6, 1);
+	sg_draw(0, 6, 1); // this needs to take a quad count from a list
 }

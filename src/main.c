@@ -9,16 +9,26 @@
 #include "sokol_app.h"
 #include "sokol_gfx.h"
 #include "sokol_glue.h"
+#include "sokol_time.h"
 
 #include "types.h"
 #include "config.h"
 #include "renderer2d.h"
+#include "camera.h"
 
-static struct { config_t config; } state;
+static struct {
+	config_t config;
+	u64 ticks;
+	camera_t *camera;
+} state;
 
 void init(void) {
 	sg_setup(&(sg_desc) { .context = sapp_sgcontext() });
+	stm_setup();
+
+	// that code will be in a lua init func
 	r2d_init();
+	state.camera = camera_init();
 }
 
 void frame(void) {
@@ -27,22 +37,54 @@ void frame(void) {
 	// physics
 
 	// render
+	u64 start = stm_now();
 	r2d_set_clear_color(V4(0.36f, 0.68f, 0.99f, 0.5f));
-	r2d_begin_scene();
+	r2d_begin_scene(state.camera);
 	r2d_set_color(V4(0.99f, 0.72f, 0.44f, 0.5f));
-	r2d_draw_quad();
+	r2d_draw_quad(V3(0.0f, 0.0f, 0.0f));
 	r2d_end_scene();
+	state.ticks = stm_laptime(&start);
 }
 
 void cleanup(void) {
+	free(state.camera);
 	r2d_shutdown();
 	sg_shutdown();
 }
 
 void event(const sapp_event *e) {
 	if (e->type == SAPP_EVENTTYPE_KEY_DOWN) {
-		if (e->key_code == SAPP_KEYCODE_ESCAPE) {
+		switch (e->key_code) {
+		case SAPP_KEYCODE_ESCAPE: {
 			sapp_request_quit();
+			break;
+		}
+		case SAPP_KEYCODE_Q: {
+			camera_rotate(state.camera, 10.0f);
+			break;
+		}
+		case SAPP_KEYCODE_E: {
+			camera_rotate(state.camera, -10.0f);
+			break;
+		}
+		case SAPP_KEYCODE_D: {
+			state.camera->pos.X += 0.01f;
+			break;
+		}
+		case SAPP_KEYCODE_A: {
+			state.camera->pos.X -= 0.01f;
+			break;
+		}
+		case SAPP_KEYCODE_W: {
+			state.camera->pos.Y += 0.01f;
+			break;
+		}
+		case SAPP_KEYCODE_S: {
+			state.camera->pos.Y -= 0.01f;
+			break;
+		}
+		default:
+			break;
 		}
 	}
 }

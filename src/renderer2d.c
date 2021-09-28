@@ -1,154 +1,195 @@
+#define SOKOL_SPRITEBATCH_IMPL
+#define CAMERA_WIDTH (480)
+#define CAMERA_HEIGHT (270)
+
 #include "HandmadeMath.h"
 #include "sokol_gfx.h"
 #include "sokol_app.h"
+#include "sokol_spritebatch.h"
 #include "shaders/flat.glsl.h"
 
 #include "renderer2d.h"
 
-// draw call limits
-static const u32 MAX_QUADS = 10000;
-
-typedef struct r2d_quad_t {
-	v2 position;
-	v2 size;
-	v4 color;
-} r2d_quad_t;
-
 static struct {
-	sg_buffer vbuf;
-	sg_pipeline pip;
-	sg_bindings bind;
+	int screen_width;
+	int screen_height;
+	int gameplay_quad_width;
+	int gameplay_quad_height;
+	int gameplay_quad_x;
+	int gameplay_quad_y;
 
 	sg_color clear_color;
-	vs_params_t uniforms;
-	sg_image textures[2];
+	sg_image base_atlas;
 
-	i32 quad_count;
-	r2d_quad_t *quad_vbuf_base;
-	r2d_quad_t *quad_vbuf_cur;
+	sg_pass_action pass_action;
+
+	sg_pass gameplay_pass;
+	sbatch_context gameplay_context;
+	sbatch_pipeline gameplay_pipeline;
+	sg_image gameplay_render_target;
+
+	sbatch_context output_context;
+	sbatch_pipeline output_pipeline;
 } state;
 
 void r2d_init(void) {
-	// blank texture - single white pixel
-	u32 pixel[] = { 0xFFFFFFFF };
-	state.textures[0] = sg_make_image(&(sg_image_desc) {
-	    .width = 1,
-	    .height = 1,
-	    .data.subimage[0][0] = SG_RANGE(pixel),
-	    .label = "quad-blank_texture",
-	});
-
+	// renderer base atlas
 	u32 pixels[] = {
 		// clang-format off
-		0xFFFFFFFF, 0xFFDDDDDD, 0xFFFFFFFF, 0xFFDDDDDD,
-		0xFFDDDDDD, 0xFFFFFFFF, 0xFFDDDDDD, 0xFFFFFFFF,
-		0xFFFFFFFF, 0xFFDDDDDD, 0xFFFFFFFF, 0xFFDDDDDD,
-		0xFFDDDDDD, 0xFFFFFFFF, 0xFFDDDDDD, 0xFFFFFFFF,
-		// clang-format on
-	};
-	state.textures[1] = sg_make_image(&(sg_image_desc) {
-	    .width = 4,
-	    .height = 4,
-	    .data.subimage[0][0] = SG_RANGE(pixels),
-	    .label = "quad-checkerboard_texture",
-	});
-
-	state.bind = (sg_bindings) {
-		.fs_images[SLOT_tex] = state.textures[1],
-	};
-
-	const float vertices[] = {
-		// clang-format off
-		// this is not compatible with D3D11 (look at texcube-sapp. sokol example)
-		// X     Y     U     V
-		1.0f, 1.0f, 1.0f, 1.0f,
-		1.0f, 0.0f, 1.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 1.0f, 0.0f, 1.0f,
+		0xFFFFFFFF, 0xFFFFFFFF, 0xFFDDDDDD, 0xFFFFFFFF, 0xFFDDDDDD,
+		0xDEADBEEF, 0xFFDDDDDD, 0xFFFFFFFF, 0xFFDDDDDD, 0xFFFFFFFF,
+		0xDEADBEEF, 0xFFFFFFFF, 0xFFDDDDDD, 0xFFFFFFFF, 0xFFDDDDDD,
+		0xDEADBEEF, 0xFFDDDDDD, 0xFFFFFFFF, 0xFFDDDDDD, 0xFFFFFFFF,
 		// clang-format on
 	};
 
-	state.bind.vertex_buffers[0] = sg_make_buffer(&(sg_buffer_desc) {
-	    .data = SG_RANGE(vertices),
-	    .label = "quad-verts",
+	state.base_atlas = sg_alloc_image();
+	sg_init_image(state.base_atlas, &(sg_image_desc) { .label = "r2d_base-atlas",
+					    .width = 5,
+					    .height = 4,
+					    .pixel_format = SG_PIXELFORMAT_RGBA8,
+					    .min_filter = SG_FILTER_NEAREST,
+					    .mag_filter = SG_FILTER_NEAREST,
+					    .wrap_u = SG_WRAP_REPEAT,
+					    .wrap_v = SG_WRAP_REPEAT,
+					    .data.subimage[0][0] = {
+						.ptr = pixels,
+						.size = (size_t)(5 * 4 * 4),
+					    } });
+	sbatch_setup(&(sbatch_desc) { 0 });
+
+	state.gameplay_render_target = sg_make_image(&(sg_image_desc) {
+	    .label = "r2d_gameplay-render-target",
+	    .render_target = true,
+	    .width = CAMERA_WIDTH,
+	    .height = CAMERA_HEIGHT,
+	    .min_filter = SG_FILTER_NEAREST,
+	    .mag_filter = SG_FILTER_NEAREST,
+	    .wrap_u = SG_WRAP_CLAMP_TO_EDGE,
+	    .wrap_v = SG_WRAP_CLAMP_TO_EDGE,
 	});
 
-	const uint16_t indices[] = { 0, 1, 2, 0, 2, 3 };
-
-	state.bind.index_buffer = sg_make_buffer(&(sg_buffer_desc) {
-	    .type = SG_BUFFERTYPE_INDEXBUFFER,
-	    .data = SG_RANGE(indices),
-	    .label = "quad-indices",
+	state.gameplay_pass = sg_make_pass(&(sg_pass_desc) {
+	    .color_attachments[0].image = state.gameplay_render_target,
+	    .label = "r2d_gameplay-pass",
 	});
 
-	state.bind.vertex_buffers[1] = sg_make_buffer(&(sg_buffer_desc) {
-	    .size = MAX_QUADS * sizeof(r2d_quad_t),
-	    .usage = SG_USAGE_STREAM,
-	    .label = "quad-parameters",
+	state.gameplay_context = sbatch_make_context(&(sbatch_context_desc) {
+	    .label = "r2d_gameplay-context",
 	});
 
-	state.quad_vbuf_base = calloc(MAX_QUADS, sizeof(r2d_quad_t));
+	state.gameplay_pipeline = sbatch_make_pipeline(&(sg_pipeline_desc) {
+	    .depth.pixel_format = SG_PIXELFORMAT_NONE,
+	    .label = "r2d_gameplay-pipeline",
+	});
 
-	sg_shader shd = sg_make_shader(flat_shader_desc(sg_query_backend()));
+	state.screen_height = sapp_height();
+	state.screen_width = sapp_width();
+	const float aspect = (float)CAMERA_WIDTH / (float)CAMERA_HEIGHT;
 
-	state.pip = sg_make_pipeline(&(sg_pipeline_desc){
-	    .layout = {
-			.buffers[1].step_func = SG_VERTEXSTEP_PER_INSTANCE,
-		    .attrs = {
-				[ATTR_vs_position] = { .format = SG_VERTEXFORMAT_FLOAT2, .buffer_index = 0},
-				[ATTR_vs_texcoord] = { .format = SG_VERTEXFORMAT_FLOAT2, .buffer_index = 0},
-				[ATTR_vs_inst_position] = { .format = SG_VERTEXFORMAT_FLOAT2, .buffer_index = 1},
-				[ATTR_vs_size] = {.format = SG_VERTEXFORMAT_FLOAT2, .buffer_index = 1 },
-				[ATTR_vs_color] = {.format = SG_VERTEXFORMAT_FLOAT4, .buffer_index = 1 },
-			},
-		},
-	    .shader = shd,
-	    .index_type = SG_INDEXTYPE_UINT16,
-	    .cull_mode = SG_CULLMODE_BACK,
-	    .depth = { .write_enabled = true, .compare = SG_COMPAREFUNC_LESS_EQUAL },
-	    .label = "quad-pipeline",
+	state.gameplay_quad_width = state.screen_width;
+	state.gameplay_quad_height = (int)((float)state.gameplay_quad_width / aspect + 0.5f);
+
+	if (state.gameplay_quad_height > state.screen_height) {
+		state.gameplay_quad_height = state.screen_height;
+		state.gameplay_quad_width =
+		    (int)((float)state.gameplay_quad_height * aspect + 0.5f);
+	}
+
+	state.gameplay_quad_x = (state.screen_width / 2) - (state.gameplay_quad_width / 2);
+	state.gameplay_quad_y = (state.screen_height / 2) - (state.gameplay_quad_height / 2);
+
+	state.output_context = sbatch_make_context(&(sbatch_context_desc) {
+	    .max_sprites_per_frame = 1,
+	    .label = "r2d_output-context",
+	});
+
+	state.output_pipeline = sbatch_make_pipeline(&(sg_pipeline_desc) {
+	    .label = "r2d_output-pipeline",
 	});
 }
 
-void r2d_shutdown(void) { free(state.quad_vbuf_base); }
+void r2d_shutdown(void) {}
 
 void r2d_begin_scene(camera_t *c) {
-	const float w = sapp_widthf();
-	const float h = sapp_heightf();
-	state.uniforms.vp = camera_get_vp(c);
-
-	sg_pass_action pass_action = {
-		.colors[0] = {
-			.action = SG_ACTION_CLEAR,
-		    .value = state.clear_color,
-		},
-	};
-	sg_begin_default_pass(&pass_action, (int)w, (int)h);
-	sg_apply_pipeline(state.pip);
-	sg_apply_bindings(&state.bind);
-	sg_apply_uniforms(SG_SHADERSTAGE_VS, SLOT_vs_params, &SG_RANGE(state.uniforms));
-
-	state.quad_vbuf_cur = state.quad_vbuf_base;
+	sg_begin_pass(state.gameplay_pass, &state.pass_action);
+	sbatch_begin(state.gameplay_context, &(sbatch_render_state) {
+						 .pipeline = state.gameplay_pipeline,
+						 .use_pixel_snap = true,
+						 .canvas_width = CAMERA_WIDTH,
+						 .canvas_height = CAMERA_HEIGHT,
+					     });
 }
 
 void r2d_end_scene(void) {
-	sg_update_buffer(
-	    state.bind.vertex_buffers[1], &(sg_range) {
-					      .ptr = state.quad_vbuf_base,
-					      .size = (size_t)state.quad_count * sizeof(r2d_quad_t),
-					  });
-	sg_draw(0, 6, state.quad_count);
+	sbatch_end();
+	sg_end_pass();
+
+	sg_begin_default_pass(&state.pass_action, state.screen_width, state.screen_height);
+	sbatch_begin(state.output_context, &(sbatch_render_state) {
+					       .pipeline = state.output_pipeline,
+					       .canvas_width = state.screen_width,
+					       .canvas_height = state.screen_height,
+					   });
+
+	sbatch_push_sprite_rect(&(sbatch_sprite_rect) {
+			.image = state.gameplay_render_target,
+			.destination = {
+				.x = (float)state.gameplay_quad_x,
+				.y = (float)state.gameplay_quad_y,
+				.width = (float)state.gameplay_quad_width,
+				.height = (float)state.gameplay_quad_height,
+			}
+
+	});
+	sbatch_end();
 	sg_end_pass();
 	sg_commit();
+	sbatch_frame();
 }
 
-void r2d_set_clear_color(v4 color) { state.clear_color = *(sg_color *)&color; }
+void r2d_set_clear_color(v4 color) {
+	state.pass_action = (sg_pass_action){
+		.colors[0] = {
+			.action = SG_ACTION_CLEAR,
+		    .value = *(sg_color *)&color,
+		},
+	};
+}
 
 void r2d_draw_quad(v2 pos, v2 size, v4 color) {
-	state.quad_vbuf_cur->position = pos;
-	state.quad_vbuf_cur->size = size;
-	state.quad_vbuf_cur->color = color;
-	state.quad_vbuf_cur++;
+	sbatch_push_sprite_rect(&(sbatch_sprite_rect) {
+			.image = state.base_atlas,
+			.destination = {
+				.x = pos.X,
+				.y = pos.Y,
+				.width = size.X,
+				.height = size.Y,
+			},
+			.source = {
+				.x = 0,
+				.y = 0,
+				.width = 1,
+				.height = 1,
+			},
+			.color = (sg_color *)&color,
+	});
+}
 
-	state.quad_count += 1;
+void r2d_draw_quad_tex(v2 pos, v2 size) {
+	sbatch_push_sprite_rect(&(sbatch_sprite_rect) {
+			.image = state.base_atlas,
+			.destination = {
+				.x = pos.X,
+				.y = pos.Y,
+				.width = size.X,
+				.height = size.Y,
+			},
+			.source = {
+				.x = 1,
+				.y = 0,
+				.width = 4,
+				.height = 4,
+			},
+	});
 }

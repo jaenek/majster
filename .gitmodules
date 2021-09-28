@@ -4,3 +4,7 @@
 [submodule "vendor/hmm"]
 	path = vendor/hmm
 	url = https://github.com/HandmadeMath/Handmade-Math
+[submodule "vendor/sokol_spritebatch"]
+	path = vendor/sokol_spritebatch
+	url = https://github.com/nyalloc/sokol
+	branch = spritebatch
